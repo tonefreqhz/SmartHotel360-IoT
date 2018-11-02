@@ -1,0 +1,18 @@
+{
+    "componentConfigs": [
+        {
+            "id": "c9866e17-3682-69c5-55fb-761355491e73",
+            "folder": "",
+            "name": "",
+            "dependencies": [],
+            "type": "IoTHub",
+            "componentInfo": {
+                "values": {
+                    "iotHubConnectionString": "HostName=sh360iot-IoTHub-4yp3l2tudkncw.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey=Q/iHWMBD7PbrERNvkM1qRf1NmEAigntX6sExQdAQeao=",
+                    "eventHubConnectionString": "Endpoint=sb://ihsuprodcyres019dednamespace.servicebus.windows.net/;SharedAccessKeyName=iothubowner;SharedAccessKey=Q/iHWMBD7PbrERNvkM1qRf1NmEAigntX6sExQdAQeao=",
+                    "eventHubConnectionPath": "iothub-ehub-sh360iot-i-897460-09644fe045"
+                }
+            }
+        }
+    ]
+}
