@@ -3,58 +3,24 @@
 #include "DevKitMQTTClient.h"
 
 #include "config.h"
-#include "utility.h"
+#include "utilities.h"
 #include "SystemTickCounter.h"
 
-static bool hasWifi = false;
+static bool connectedToWiFi = false;
 int messageCount = 1;
-static bool messageSending = true;
-static uint64_t send_interval_ms;
+static bool sendModeIsActive = true;
+static uint64_t sendIntervalInMs;
 static char outputString[10];
-
-static void InitWifi()
-{
-  Screen.print(2, "Connecting...");
-  
-  if (WiFi.begin() == WL_CONNECTED)
-  {
-    IPAddress ip = WiFi.localIP();
-    Screen.print(1, ip.get_address());
-    hasWifi = true;
-    Screen.print(2, "Running... \r\n");
-  }
-  else
-  {
-    hasWifi = false;
-    Screen.print(1, "No Wi-Fi\r\n ");
-  }
-}
+static float desiredTempFahrenheit;
+static int lightLevel;
+static int desiredLightLevel;
 
 static void SendConfirmationCallback(IOTHUB_CLIENT_CONFIRMATION_RESULT result)
 {
   if (result == IOTHUB_CLIENT_CONFIRMATION_OK)
   {
-    blinkSendConfirmation();
+    showSendConfirmation();
   }
-}
-
-static void MessageCallback(const char* payLoad, int size)
-{
-  blinkLED();
-  Screen.print(1, payLoad, true);
-}
-
-static void DeviceTwinCallback(DEVICE_TWIN_UPDATE_STATE updateState, const unsigned char *payLoad, int size)
-{
-  char *temp = (char *)malloc(size + 1);
-  if (temp == NULL)
-  {
-    return;
-  }
-  memcpy(temp, payLoad, size);
-  temp[size] = '\0';
-  parseTwinMessage(updateState, temp);
-  free(temp);
 }
 
 static int  DeviceMethodCallback(const char *methodName, const unsigned char *payload, int size, unsigned char **response, int *response_size)
@@ -63,19 +29,32 @@ static int  DeviceMethodCallback(const char *methodName, const unsigned char *pa
   const char *responseMessage = "\"Successfully invoke device method\"";
   int result = 200;
 
-  if (strcmp(methodName, "start") == 0)
+  if (strcmp(methodName, "StartDeviceFeed") == 0)
   {
-    LogInfo("Start sending temperature and humidity data");
-    messageSending = true;
+    LogInfo("Start sending sensor data");
+    sendModeIsActive = true;
   }
-  else if (strcmp(methodName, "stop") == 0)
+  else if (strcmp(methodName, "StopDeviceFeed") == 0)
   {
-    LogInfo("Stop sending temperature and humidity data");
-    messageSending = false;
+    LogInfo("Stop sending sensor data");
+    sendModeIsActive = false;
+  }
+  else if (strcmp(methodName, "SetDesiredAmbientLight") == 0)
+  {
+    //TODO
+    desiredLightLevel = 0;
+    LogInfo("Set desired ambient light to: '%d'", desiredLightLevel);
+    lightLevel = desiredLightLevel;
+  }
+  else if (strcmp(methodName, "SetDesiredTemperatureFahrenheit") == 0)
+  {
+    //TODO
+    desiredTempFahrenheit = 0;
+    LogInfo("Set desired temperature to: '%f' F", desiredTempFahrenheit);
   }
   else
   {
-    LogInfo("No method %s found", methodName);
+    LogInfo("No method with the name '%s' found", methodName);
     responseMessage = "\"No method found\"";
     result = 404;
   }
@@ -89,63 +68,80 @@ static int  DeviceMethodCallback(const char *methodName, const unsigned char *pa
 void setup()
 {
   Screen.init();
-  Screen.print(0, "SmartHotel Test");
-  Screen.print(2, "Initializing...");
+  Screen.print(0, "SmartHotel IoT");
+  Screen.print(1, "Initializing...");
   
-  Screen.print(3, " > Serial");
+  Screen.print(2, " > Serial");
   Serial.begin(115200);
 
-  Screen.print(3, " > WiFi");
-  hasWifi = false;
-  InitWifi();
-  if (!hasWifi)
+  Screen.print(2, " > WiFi");
+  Screen.print(3, "Connecting...");
+  connectedToWiFi = false;
+  char* wifiAddress = initializeWiFi();
+  if (wifiAddress == nullptr)
   {
+    connectedToWiFi = false;
+    Screen.print(3, "No Wi-Fi\r\n ");
     return;
   }
+  sprintf(outputString, "%s", wifiAddress);
+  connectedToWiFi = true;
+  Screen.print(3, "Connected\r\n");
+  LogTrace("Connected to WiFI", NULL);
 
-  LogTrace("HappyPathSetup", NULL);
+  Screen.print(2, " > Sensors");
+  initSensors();
 
-  Screen.print(3, " > Sensors");
-  SensorInit();
-
-  Screen.print(3, " > IoT Hub");
-  DevKitMQTTClient_SetOption(OPTION_MINI_SOLUTION_NAME, "SmartHotelTest");
-  DevKitMQTTClient_Init(true);
+  Screen.print(2, " > IoT Hub");
+  DevKitMQTTClient_SetOption(OPTION_MINI_SOLUTION_NAME, "SmartHotelDevice");
+  DevKitMQTTClient_Init();
 
   DevKitMQTTClient_SetSendConfirmationCallback(SendConfirmationCallback);
-  DevKitMQTTClient_SetMessageCallback(MessageCallback);
-  DevKitMQTTClient_SetDeviceTwinCallback(DeviceTwinCallback);
   DevKitMQTTClient_SetDeviceMethodCallback(DeviceMethodCallback);
 
-  send_interval_ms = SystemTickCounterRead();
+  sendIntervalInMs = SystemTickCounterRead();
 
-  Screen.print(3, "");
+  Screen.print(1, outputString);
+  Screen.print(2, "Ready");
+
+  desiredTempFahrenheit = 70.0f;
+
+  desiredLightLevel = 85;
+  lightLevel = desiredLightLevel;
+
+  delay(1000);
 }
 
 void loop()
 {
-  if (hasWifi)
+  if (connectedToWiFi)
   {
-    if (messageSending)
+    if (sendModeIsActive)
     {
-      if ((int)(SystemTickCounterRead() - send_interval_ms) >= getInterval())
+      if ((int)(SystemTickCounterRead() - sendIntervalInMs) >= getInterval())
       {
-      // Send teperature data
         char messagePayload[MESSAGE_MAX_LEN];
 
-        float temperature = readTemperature();
-        //float humidity = readHumidity();
+        float tempCelsius = readTemperature();
+        float tempFahrenheit = (tempCelsius * 1.8f) + 32.0f;
 
-        bool temperatureAlert = createSensorMessagePayload(messageCount++, temperature, messagePayload);
+        sprintf(outputString, "T- C:%.1f D:%.1f", tempFahrenheit, desiredTempFahrenheit);
+        Screen.print(1, outputString);
+
+        sprintf(outputString, "L- C:%d D:%d", lightLevel, desiredLightLevel);
+        Screen.print(2, outputString);
+        setDeviceLightLevel(lightLevel);
+
+        boolean motionDetected = readMotion();
+
+        sprintf(outputString, "M- %s", motionDetected ? "Yes" : "No");
+        Screen.print(3, outputString);
+
+        createSensorMessagePayload(messageCount++, tempFahrenheit, motionDetected, messagePayload);
         EVENT_INSTANCE* message = DevKitMQTTClient_Event_Generate(messagePayload, MESSAGE);
-        DevKitMQTTClient_Event_AddProp(message, "temperatureAlert", temperatureAlert ? "true" : "false");
         DevKitMQTTClient_SendEventInstance(message);
         
-        send_interval_ms = SystemTickCounterRead();
-
-        float tempFahrenheit = (temperature * 1.8f) + 32.0f;
-        sprintf(outputString, "Temp: %.1f F", tempFahrenheit);
-        Screen.print(3, outputString);
+        sendIntervalInMs = SystemTickCounterRead();
       }
     }
     else
