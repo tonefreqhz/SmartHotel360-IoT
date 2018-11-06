@@ -10,7 +10,7 @@ static bool connectedToWiFi = false;
 int messageCount = 1;
 static bool sendModeIsActive = true;
 static uint64_t sendIntervalInMs;
-static char outputString[10];
+static char outputString[20];
 static float desiredTempFahrenheit;
 static int lightLevel;
 static int desiredLightLevel;
@@ -46,7 +46,7 @@ static int  DeviceMethodCallback(const char *methodName, const unsigned char *pa
     LogInfo("Set desired ambient light to: '%d'", desiredLightLevel);
     lightLevel = desiredLightLevel;
   }
-  else if (strcmp(methodName, "SetDesiredTemperatureFahrenheit") == 0)
+  else if (strcmp(methodName, "SetDesiredTemperature") == 0)
   {
     //TODO
     desiredTempFahrenheit = 0;
@@ -132,12 +132,12 @@ void loop()
         Screen.print(2, outputString);
         setDeviceLightLevel(lightLevel);
 
-        boolean motionDetected = readMotion();
+        bool roomOccupied = readRoomOccupied();
 
-        sprintf(outputString, "M- %s", motionDetected ? "Yes" : "No");
+        sprintf(outputString, "M- %s", roomOccupied ? "Yes" : "No");
         Screen.print(3, outputString);
 
-        createSensorMessagePayload(messageCount++, tempFahrenheit, motionDetected, messagePayload);
+        createSensorMessagePayload(messageCount++, tempFahrenheit, roomOccupied, messagePayload);
         EVENT_INSTANCE* message = DevKitMQTTClient_Event_Generate(messagePayload, MESSAGE);
         DevKitMQTTClient_SendEventInstance(message);
         

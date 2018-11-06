@@ -6,11 +6,11 @@ char* initializeWiFi(void);
 void initSensors(void);
 
 float readTemperature();
-boolean readMotion();
+bool readRoomOccupied();
 
 void setDeviceLightLevel(int desiredLightLevel);
 
-bool createSensorMessagePayload(int messageId, float temperature, boolean motionDetected, char *payload);
+bool createSensorMessagePayload(int messageId, float temperature, bool motionDetected, char *payload);
 
 int getInterval(void);
 
