@@ -10,7 +10,7 @@
 #define RGB_LED_BRIGHTNESS 32
 #define LOOP_DELAY 1000
 #define EXPECTED_COUNT 5
-#define MAGNET_PRESENT_DELTA 400
+#define MAGNET_PRESENT_DELTA 250
 
 
 DevI2C *i2c;
@@ -148,8 +148,13 @@ void setDeviceLightLevel(int lightLevel)
     }
 }
 
-void createSensorMessagePayload(int messageId, float temperature, bool roomOccupied, char *payload)
+bool createSensorMessagePayload(int messageId, float temperature, bool roomOccupied, char *payload)
 {
+    if (temperature == lastTemperatureSent && roomOccupied == lastRoomOccupiedSent)
+    {
+        return false;
+    }
+    
     JSON_Value *root_value = json_value_init_object();
     JSON_Object *root_object = json_value_get_object(root_value);
     char* serialized_string = NULL;
@@ -173,4 +178,6 @@ void createSensorMessagePayload(int messageId, float temperature, bool roomOccup
     snprintf(payload, MESSAGE_MAX_LEN, "%s", serialized_string);
     json_free_serialized_string(serialized_string);
     json_value_free(root_value);
+
+    return true;
 }

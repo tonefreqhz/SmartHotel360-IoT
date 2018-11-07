@@ -29,6 +29,21 @@ static int  DeviceMethodCallback(const char *methodName, const unsigned char *pa
   const char *responseMessage = "\"Successfully invoke device method\"";
   int result = 200;
 
+  float argument = 0;
+
+  if (size > 0)
+  {
+    char *temp = (char *)malloc(size + 1);
+    if (temp == NULL)
+    {
+      return result;
+    }
+    memcpy(temp, payload, size);
+    temp[size] = '\0';
+    argument = atof(temp);
+    free(temp);
+  }
+
   if (strcmp(methodName, "StartDeviceFeed") == 0)
   {
     LogInfo("Start sending sensor data");
@@ -41,15 +56,21 @@ static int  DeviceMethodCallback(const char *methodName, const unsigned char *pa
   }
   else if (strcmp(methodName, "SetDesiredAmbientLight") == 0)
   {
-    //TODO
-    desiredLightLevel = 0;
+    desiredLightLevel = argument*100.0f;
+    if (desiredLightLevel < 0)
+    {
+      desiredLightLevel = 0;
+    }
+    else if (desiredLightLevel > 100)
+    {
+      desiredLightLevel = 100;
+    }
     LogInfo("Set desired ambient light to: '%d'", desiredLightLevel);
     lightLevel = desiredLightLevel;
   }
   else if (strcmp(methodName, "SetDesiredTemperature") == 0)
   {
-    //TODO
-    desiredTempFahrenheit = 0;
+    desiredTempFahrenheit = argument;
     LogInfo("Set desired temperature to: '%f' F", desiredTempFahrenheit);
   }
   else
@@ -94,7 +115,7 @@ void setup()
 
   Screen.print(2, " > IoT Hub");
   DevKitMQTTClient_SetOption(OPTION_MINI_SOLUTION_NAME, "SmartHotelDevice");
-  DevKitMQTTClient_Init();
+  DevKitMQTTClient_Init(true);
 
   DevKitMQTTClient_SetSendConfirmationCallback(SendConfirmationCallback);
   DevKitMQTTClient_SetDeviceMethodCallback(DeviceMethodCallback);
@@ -134,12 +155,14 @@ void loop()
 
         bool roomOccupied = readRoomOccupied();
 
-        sprintf(outputString, "M- %s", roomOccupied ? "Yes" : "No");
+        sprintf(outputString, "%s", roomOccupied ? "Occupied" : "Vacant");
         Screen.print(3, outputString);
 
-        createSensorMessagePayload(messageCount++, tempFahrenheit, roomOccupied, messagePayload);
-        EVENT_INSTANCE* message = DevKitMQTTClient_Event_Generate(messagePayload, MESSAGE);
-        DevKitMQTTClient_SendEventInstance(message);
+        if (createSensorMessagePayload(messageCount++, tempFahrenheit, roomOccupied, messagePayload))
+        {
+          EVENT_INSTANCE* message = DevKitMQTTClient_Event_Generate(messagePayload, MESSAGE);
+          DevKitMQTTClient_SendEventInstance(message);
+        }
         
         sendIntervalInMs = SystemTickCounterRead();
       }
