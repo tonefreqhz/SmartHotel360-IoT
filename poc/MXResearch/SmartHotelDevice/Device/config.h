@@ -1,3 +1,5 @@
 #define INTERVAL 2000
 
 #define MESSAGE_MAX_LEN 256
+
+#define AZURE_FUNCTION_APP_NAME ""

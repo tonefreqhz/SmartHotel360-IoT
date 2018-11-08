@@ -16,4 +16,8 @@ int getInterval(void);
 
 void showSendConfirmation(void);
 
+bool sendPayloadToFunction(char *azureFunctionUri, char *content);
+
+char* httpTest();
+
 #endif /* UTILITY_H */

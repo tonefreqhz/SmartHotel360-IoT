@@ -14,6 +14,7 @@ static char outputString[20];
 static float desiredTempFahrenheit;
 static int lightLevel;
 static int desiredLightLevel;
+static char azureFunctionUri[128];
 
 static void SendConfirmationCallback(IOTHUB_CLIENT_CONFIRMATION_RESULT result)
 {
@@ -73,6 +74,11 @@ static int  DeviceMethodCallback(const char *methodName, const unsigned char *pa
     desiredTempFahrenheit = argument;
     LogInfo("Set desired temperature to: '%f' F", desiredTempFahrenheit);
   }
+  else if (strcmp(methodName, "SetFeedback") == 0)
+  {
+    sprintf(outputString, "F: %.1f", argument);
+    Screen.print(0, outputString);
+  }
   else
   {
     LogInfo("No method with the name '%s' found", methodName);
@@ -122,6 +128,8 @@ void setup()
 
   sendIntervalInMs = SystemTickCounterRead();
 
+  sprintf(azureFunctionUri, "http://%s.azurewebsites.net/api/SmartHotelFunction", (char *)AZURE_FUNCTION_APP_NAME);
+
   Screen.print(1, outputString);
   Screen.print(2, "Ready");
 
@@ -162,6 +170,17 @@ void loop()
         {
           EVENT_INSTANCE* message = DevKitMQTTClient_Event_Generate(messagePayload, MESSAGE);
           DevKitMQTTClient_SendEventInstance(message);
+
+          if (sendPayloadToFunction(azureFunctionUri, messagePayload))
+          {
+            sprintf(outputString, "Success");
+            Screen.print(3, outputString);
+          }
+          else
+          {
+            sprintf(outputString, "Failure");
+            Screen.print(3, outputString);
+          }
         }
         
         sendIntervalInMs = SystemTickCounterRead();
