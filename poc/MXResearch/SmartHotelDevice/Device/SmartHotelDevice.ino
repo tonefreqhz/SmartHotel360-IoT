@@ -14,7 +14,8 @@ static char outputString[20];
 static float desiredTempFahrenheit;
 static int lightLevel;
 static int desiredLightLevel;
-static char azureFunctionUri[128];
+//static char azureFunctionUri[128];
+static char* dTIoTHubConnectionString;
 
 static void SendConfirmationCallback(IOTHUB_CLIENT_CONFIRMATION_RESULT result)
 {
@@ -128,7 +129,11 @@ void setup()
 
   sendIntervalInMs = SystemTickCounterRead();
 
-  sprintf(azureFunctionUri, "http://%s.azurewebsites.net/api/SmartHotelFunction", (char *)AZURE_FUNCTION_APP_NAME);
+  //sprintf(azureFunctionUri, "http://%s.azurewebsites.net/api/SmartHotelFunction", (char *)AZURE_FUNCTION_APP_NAME);
+
+  const char* connectionString = getDTIoTHubConnectionString(HARDWARE_ID, SAS_TOKEN);
+  dTIoTHubConnectionString = (char *)malloc(strlen(connectionString) + 1);
+  sprintf(dTIoTHubConnectionString, "%s", connectionString);
 
   Screen.print(1, outputString);
   Screen.print(2, "Ready");
@@ -171,16 +176,16 @@ void loop()
           EVENT_INSTANCE* message = DevKitMQTTClient_Event_Generate(messagePayload, MESSAGE);
           DevKitMQTTClient_SendEventInstance(message);
 
-          if (sendPayloadToFunction(azureFunctionUri, messagePayload))
-          {
-            sprintf(outputString, "Success");
-            Screen.print(3, outputString);
-          }
-          else
-          {
-            sprintf(outputString, "Failure");
-            Screen.print(3, outputString);
-          }
+          //if (sendPayloadToFunction(azureFunctionUri, messagePayload))
+          //{
+          //  sprintf(outputString, "Success");
+          //  Screen.print(3, outputString);
+          //}
+          //else
+          //{
+          //  sprintf(outputString, "Failure");
+          //  Screen.print(3, outputString);
+          //}
         }
         
         sendIntervalInMs = SystemTickCounterRead();

@@ -14,6 +14,11 @@
 #define MAGNET_PRESENT_DELTA 250
 #define MAX_UPLOAD_SIZE (64 * 1024)
 
+//#define MANAGEMENT_BASE_URL "https://sh360iot-DigitalTwins-4yp3l2tudkncw.westcentralus.azuresmartspaces.net/management/api/v1.0/";
+#define MANAGEMENT_BASE_URL "https://SmartHotelADT.westus2.azuresmartspaces.net/management/api/v1.0/"
+
+#define DEVICES_INCLUDE_ARGUMENT "includes=Sensors,ConnectionString,Types,SensorsTypes"
+
 
 DevI2C *i2c;
 HTS221Sensor *tempSensor;
@@ -186,7 +191,7 @@ bool createSensorMessagePayload(int messageId, float temperature, bool roomOccup
 
 bool sendPayloadToFunction(char *azureFunctionUri, char *content)
 {
-    int length = strlen(content);
+    int length = strlen(content) + 1;
 
     if (content == NULL || length <= 0 || length > MAX_UPLOAD_SIZE)
     {
@@ -199,6 +204,34 @@ bool sendPayloadToFunction(char *azureFunctionUri, char *content)
 
     return (response != NULL && response->status_code == 200);
 }
+
+const char* getDTIoTHubConnectionString(char* hardwareId, char* sasToken)
+{
+    char azureFunctionUri[256];
+    sprintf(azureFunctionUri, "%sDevices?hardwareIds=%s&%s", MANAGEMENT_BASE_URL, hardwareId, DEVICES_INCLUDE_ARGUMENT);
+
+    HTTPClient *httpClient = new HTTPClient(HTTP_GET, azureFunctionUri);
+    httpClient->set_header("Authorization", sasToken);
+    const Http_Response* result = httpClient->send();
+
+    char outputString[512];
+
+    char* status = (char *)malloc(20);
+
+    JSON_Value* root_value = json_parse_string(result->body);
+    JSON_Array* devices = json_value_get_array(root_value);
+    if (json_array_get_count(devices) != 1)
+    {
+        return nullptr;
+    }
+    JSON_Object* device = json_array_get_object(devices, 0);
+    const char* connectionString = json_object_get_string(device, "connectionString");
+
+    delete httpClient;
+
+    return connectionString;
+}
+
 
 const char SSL_CA_PEM[] = "-----BEGIN CERTIFICATE-----\n"
                           "MIIEkjCCA3qgAwIBAgIQCgFBQgAAAVOFc2oLheynCDANBgkqhkiG9w0BAQsFADA/\n"

@@ -18,6 +18,8 @@ void showSendConfirmation(void);
 
 bool sendPayloadToFunction(char *azureFunctionUri, char *content);
 
+const char* getDTIoTHubConnectionString(char* hardwareId, char* sasToken);
+
 char* httpTest();
 
 #endif /* UTILITY_H */
