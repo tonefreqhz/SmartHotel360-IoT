@@ -1,6 +1,6 @@
 #include "AZ3166WiFi.h"
 #include "AzureIotHub.h"
-#include "DevKitMQTTClient.h"
+#include "CustomMQTTClient.h"
 
 #include "config.h"
 #include "utilities.h"
@@ -16,6 +16,9 @@ static int lightLevel;
 static int desiredLightLevel;
 //static char azureFunctionUri[128];
 static char* dTIoTHubConnectionString;
+static int iotHubMessageCount = 0;
+//static IOTHUB_CLIENT_LL_HANDLE iotHubClientHandle;
+//static IOTHUB_CLIENT_HANDLE iotHubClientHandle;
 
 static void SendConfirmationCallback(IOTHUB_CLIENT_CONFIRMATION_RESULT result)
 {
@@ -24,6 +27,15 @@ static void SendConfirmationCallback(IOTHUB_CLIENT_CONFIRMATION_RESULT result)
     showSendConfirmation();
   }
 }
+
+//static void SendConfirmationCallback2(IOTHUB_CLIENT_CONFIRMATION_RESULT_TAG result, void* dummy)
+//{
+//  Screen.print(0, "Success!");
+//  if (result == IOTHUB_CLIENT_CONFIRMATION_OK)
+//  {
+//    showSendConfirmation();
+//  }
+//}
 
 static int  DeviceMethodCallback(const char *methodName, const unsigned char *payload, int size, unsigned char **response, int *response_size)
 {
@@ -121,11 +133,11 @@ void setup()
   initSensors();
 
   Screen.print(2, " > IoT Hub");
-  DevKitMQTTClient_SetOption(OPTION_MINI_SOLUTION_NAME, "SmartHotelDevice");
-  DevKitMQTTClient_Init(true);
+  CustomMQTTClient_SetOption(OPTION_MINI_SOLUTION_NAME, "SmartHotelDevice");
+  CustomMQTTClient_Init(true, false);
 
-  DevKitMQTTClient_SetSendConfirmationCallback(SendConfirmationCallback);
-  DevKitMQTTClient_SetDeviceMethodCallback(DeviceMethodCallback);
+  CustomMQTTClient_SetSendConfirmationCallback(SendConfirmationCallback);
+  CustomMQTTClient_SetDeviceMethodCallback(DeviceMethodCallback);
 
   sendIntervalInMs = SystemTickCounterRead();
 
@@ -134,6 +146,11 @@ void setup()
   const char* connectionString = getDTIoTHubConnectionString(HARDWARE_ID, SAS_TOKEN);
   dTIoTHubConnectionString = (char *)malloc(strlen(connectionString) + 1);
   sprintf(dTIoTHubConnectionString, "%s", connectionString);
+
+
+  //iotHubClientHandle = IoTHubClient_LL_CreateFromConnectionString(dTIoTHubConnectionString, MQTT_Protocol);
+  //iotHubClientHandle = IoTHubClient_CreateFromConnectionString(dTIoTHubConnectionString, MQTT_Protocol);
+
 
   Screen.print(1, outputString);
   Screen.print(2, "Ready");
@@ -173,8 +190,22 @@ void loop()
 
         if (createSensorMessagePayload(messageCount++, tempFahrenheit, roomOccupied, messagePayload))
         {
-          EVENT_INSTANCE* message = DevKitMQTTClient_Event_Generate(messagePayload, MESSAGE);
-          DevKitMQTTClient_SendEventInstance(message);
+          EVENT_INSTANCE* message = CustomMQTTClient_Event_Generate(messagePayload, MESSAGE);
+          CustomMQTTClient_SendEventInstance(message);
+
+
+          //char msgText[100];
+          //EVENT_INSTANCE message2;
+          //sprintf_s(msgText, sizeof(msgText), "Message_%d_From_IoTHubClient_LL_Over_HTTP", iotHubMessageCount);
+          //message2.messageHandle = IoTHubMessage_CreateFromByteArray((const unsigned char*)msgText, strlen(msgText));
+          //iotHubMessageCount++;
+
+          //IoTHubClient_LL_SendEventAsync(iotHubClientHandle, message2.messageHandle, SendConfirmationCallback2, &message2);
+          //IoTHubClient_SendEventAsync(iotHubClientHandle, message2.messageHandle, SendConfirmationCallback2, &message2);
+
+          //IoTHubClient_LL_SendEventAsync(iotHubClientHandle, message->messageHandle, SendConfirmationCallback2, message);
+          //IoTHubClient_SendEventAsync(iotHubClientHandle, message->messageHandle, SendConfirmationCallback2, message);
+
 
           //if (sendPayloadToFunction(azureFunctionUri, messagePayload))
           //{
@@ -193,7 +224,7 @@ void loop()
     }
     else
     {
-      DevKitMQTTClient_Check();
+      CustomMQTTClient_Check(true);
       Screen.print(3, "Idle");
     }
   }
