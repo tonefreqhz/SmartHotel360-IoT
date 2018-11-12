@@ -36,12 +36,12 @@ static DEVICE_METHOD_CALLBACK _device_method_callback = NULL;
 static REPORT_CONFIRMATION_CALLBACK _report_confirmation_callback = NULL;
 static bool enableDeviceTwin = false;
 
+static char* storedIotHubConnectionString;
+
 static uint64_t iothub_check_ms;
 
 static char *iothub_hostname = NULL;
 static char *miniSolutionName = NULL;
-
-extern bool is_iothub_from_dps;
 
 extern void ota_callback(const unsigned char *payLoad, size_t size);
 
@@ -60,7 +60,7 @@ static void CheckConnection()
             LogInfo(">>>Re-connect.");
             // Re-connect the IoT Hub
             CustomMQTTClient_Close();
-            CustomMQTTClient_Init(enableDeviceTwin, false);
+            CustomMQTTClient_Init(storedIotHubConnectionString, enableDeviceTwin, false);
             resetClient = false;
         }
     }
@@ -453,7 +453,7 @@ void CustomMQTTClient_Event_AddProp(EVENT_INSTANCE *message, const char *key, co
     Map_AddOrUpdate(propMap, key, value);
 }
 
-bool CustomMQTTClient_Init(bool hasDeviceTwin, bool traceOn)
+bool CustomMQTTClient_Init(char* connectionString, bool hasDeviceTwin, bool traceOn)
 {
     if (iotHubClientHandle != NULL)
     {
@@ -468,53 +468,23 @@ bool CustomMQTTClient_Init(bool hasDeviceTwin, bool traceOn)
     trackingId = 0;
 
     // Create the IoTHub client
-    if (is_iothub_from_dps)
+    if (platform_init() != 0)
     {
-        // Use DPS
-        iothub_hostname = DevkitDPSGetIoTHubURI();
-        iotHubClientHandle = IoTHubClient_LL_CreateFromDeviceAuth(iothub_hostname, DevkitDPSGetDeviceID(), MQTT_Protocol);
-        if (iotHubClientHandle)
-        {
-            LogInfo(">>>IoTHubClient_LL_CreateFromDeviceAuth %s, %s, %p", iothub_hostname, DevkitDPSGetDeviceID(), iotHubClientHandle);
-        }
-        else
-        {
-            LogError(">>>IoTHubClient_LL_CreateFromDeviceAuth %s, %s", iothub_hostname, DevkitDPSGetDeviceID());
-            return false;
-        }
+        LogError("Failed to initialize the platform.");
+        return false;
     }
-    else
+
+    iothub_hostname = GetHostNameFromConnectionString(connectionString);
+
+    // Create the IoTHub client
+    if ((iotHubClientHandle = IoTHubClient_LL_CreateFromConnectionString(connectionString, MQTT_Protocol)) == NULL)
     {
-        if (platform_init() != 0)
-        {
-            LogError("Failed to initialize the platform.");
-            return false;
-        }
-
-        // Load connection from EEPROM
-        EEPROMInterface eeprom;
-        uint8_t connString[AZ_IOT_HUB_MAX_LEN + 1] = {'\0'};
-        int ret = eeprom.read(connString, AZ_IOT_HUB_MAX_LEN, 0x00, AZ_IOT_HUB_ZONE_IDX);
-        if (ret < 0)
-        {
-            LogError("Unable to get the azure iot connection string from EEPROM. Please set the value in configuration mode.");
-            return false;
-        }
-        else if (ret == 0)
-        {
-            LogError("The connection string is empty.\r\nPlease set the value in configuration mode.");
-            return false;
-        }
-
-        iothub_hostname = GetHostNameFromConnectionString((char *)connString);
-
-        // Create the IoTHub client
-        if ((iotHubClientHandle = IoTHubClient_LL_CreateFromConnectionString((char *)connString, MQTT_Protocol)) == NULL)
-        {
-            CustomLogTrace("Create", "IoT hub establish failed");
-            return false;
-        }
+        CustomLogTrace("Create", "IoT hub establish failed");
+        return false;
     }
+
+    storedIotHubConnectionString = (char *)malloc(strlen(connectionString) + 1);
+    sprintf(storedIotHubConnectionString, "%s", connectionString);
 
     int keepalive = MQTT_KEEPALIVE_INTERVAL_S;
     IoTHubClient_LL_SetOption(iotHubClientHandle, "keepalive", &keepalive);
@@ -729,7 +699,7 @@ void CustomMQTTClient_Close(void)
         IoTHubClient_LL_Destroy(iotHubClientHandle);
         iotHubClientHandle = NULL;
 
-        if (!is_iothub_from_dps && iothub_hostname)
+        if (iothub_hostname)
         {
             free(iothub_hostname);
             iothub_hostname = NULL;

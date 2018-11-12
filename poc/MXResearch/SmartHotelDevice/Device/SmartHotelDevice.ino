@@ -15,7 +15,7 @@ static float desiredTempFahrenheit;
 static int lightLevel;
 static int desiredLightLevel;
 //static char azureFunctionUri[128];
-static char* dTIoTHubConnectionString;
+static char* dtIotHubConnectionString;
 static int iotHubMessageCount = 0;
 //static IOTHUB_CLIENT_LL_HANDLE iotHubClientHandle;
 //static IOTHUB_CLIENT_HANDLE iotHubClientHandle;
@@ -132,24 +132,41 @@ void setup()
   Screen.print(2, " > Sensors");
   initSensors();
 
+
+
   Screen.print(2, " > IoT Hub");
+
+  const char* connectionString = getDTIoTHubConnectionString(HARDWARE_ID, SAS_TOKEN);
+  dtIotHubConnectionString = (char *)malloc(strlen(connectionString) + 1);
+  sprintf(dtIotHubConnectionString, "%s", connectionString);
+
+
+  // Load connection from EEPROM
+  //EEPROMInterface eeprom;
+  //uint8_t connString[AZ_IOT_HUB_MAX_LEN + 1] = {'\0'};
+  //int ret = eeprom.read(connString, AZ_IOT_HUB_MAX_LEN, 0x00, AZ_IOT_HUB_ZONE_IDX);
+  //if (ret < 0)
+  //{
+  //    LogError("Unable to get the azure iot connection string from EEPROM. Please set the value in configuration mode.");
+  //    return;
+  //}
+  //else if (ret == 0)
+  //{
+  //    LogError("The connection string is empty.\r\nPlease set the value in configuration mode.");
+  //    return;
+  //}
+  //dtIotHubConnectionString = (char *)malloc(AZ_IOT_HUB_MAX_LEN + 1);
+  //sprintf(dtIotHubConnectionString, "%s", connString);
+
+
+
   CustomMQTTClient_SetOption(OPTION_MINI_SOLUTION_NAME, "SmartHotelDevice");
-  CustomMQTTClient_Init(true, false);
+  CustomMQTTClient_Init(dtIotHubConnectionString, true, false);
 
   CustomMQTTClient_SetSendConfirmationCallback(SendConfirmationCallback);
   CustomMQTTClient_SetDeviceMethodCallback(DeviceMethodCallback);
 
   sendIntervalInMs = SystemTickCounterRead();
-
-  //sprintf(azureFunctionUri, "http://%s.azurewebsites.net/api/SmartHotelFunction", (char *)AZURE_FUNCTION_APP_NAME);
-
-  const char* connectionString = getDTIoTHubConnectionString(HARDWARE_ID, SAS_TOKEN);
-  dTIoTHubConnectionString = (char *)malloc(strlen(connectionString) + 1);
-  sprintf(dTIoTHubConnectionString, "%s", connectionString);
-
-
-  //iotHubClientHandle = IoTHubClient_LL_CreateFromConnectionString(dTIoTHubConnectionString, MQTT_Protocol);
-  //iotHubClientHandle = IoTHubClient_CreateFromConnectionString(dTIoTHubConnectionString, MQTT_Protocol);
 
 
   Screen.print(1, outputString);
@@ -179,7 +196,7 @@ void loop()
         sprintf(outputString, "T- C:%.1f D:%.1f", tempFahrenheit, desiredTempFahrenheit);
         Screen.print(1, outputString);
 
-        sprintf(outputString, "L- C:%d D:%d", lightLevel, desiredLightLevel);
+        sprintf(outputString, "L- C:%d%% D:%d%%", lightLevel, desiredLightLevel);
         Screen.print(2, outputString);
         setDeviceLightLevel(lightLevel);
 
@@ -192,31 +209,6 @@ void loop()
         {
           EVENT_INSTANCE* message = CustomMQTTClient_Event_Generate(messagePayload, MESSAGE);
           CustomMQTTClient_SendEventInstance(message);
-
-
-          //char msgText[100];
-          //EVENT_INSTANCE message2;
-          //sprintf_s(msgText, sizeof(msgText), "Message_%d_From_IoTHubClient_LL_Over_HTTP", iotHubMessageCount);
-          //message2.messageHandle = IoTHubMessage_CreateFromByteArray((const unsigned char*)msgText, strlen(msgText));
-          //iotHubMessageCount++;
-
-          //IoTHubClient_LL_SendEventAsync(iotHubClientHandle, message2.messageHandle, SendConfirmationCallback2, &message2);
-          //IoTHubClient_SendEventAsync(iotHubClientHandle, message2.messageHandle, SendConfirmationCallback2, &message2);
-
-          //IoTHubClient_LL_SendEventAsync(iotHubClientHandle, message->messageHandle, SendConfirmationCallback2, message);
-          //IoTHubClient_SendEventAsync(iotHubClientHandle, message->messageHandle, SendConfirmationCallback2, message);
-
-
-          //if (sendPayloadToFunction(azureFunctionUri, messagePayload))
-          //{
-          //  sprintf(outputString, "Success");
-          //  Screen.print(3, outputString);
-          //}
-          //else
-          //{
-          //  sprintf(outputString, "Failure");
-          //  Screen.print(3, outputString);
-          //}
         }
         
         sendIntervalInMs = SystemTickCounterRead();
