@@ -20,34 +20,20 @@
 #define EVENT_CONFIRMED -2
 #define EVENT_FAILED -3
 
-static int callbackCounter;
-static IOTHUB_CLIENT_LL_HANDLE iotHubClientHandle = NULL;
-static int receiveContext = 0;
-static int statusContext = 0;
-static int trackingId = 0;
-static int currentTrackingId = -1;
-static bool clientConnected = false;
-static bool resetClient = false;
-static CONNECTION_STATUS_CALLBACK _connection_status_callback = NULL;
-static SEND_CONFIRMATION_CALLBACK _send_confirmation_callback = NULL;
-static MESSAGE_CALLBACK _message_callback = NULL;
-static DEVICE_TWIN_CALLBACK _device_twin_callback = NULL;
-static DEVICE_METHOD_CALLBACK _device_method_callback = NULL;
-static REPORT_CONFIRMATION_CALLBACK _report_confirmation_callback = NULL;
-static bool enableDeviceTwin = false;
 
-static char* storedIotHubConnectionString;
 
-static uint64_t iothub_check_ms;
+CustomMQTTClient::CustomMQTTClient(char* connectionString, bool hasDeviceTwin, bool traceOn)
+{
+    CustomMQTTClient::CustomMQTTClient_Init(connectionString, hasDeviceTwin, traceOn);
+}
 
-static char *iothub_hostname = NULL;
-static char *miniSolutionName = NULL;
-
-extern void ota_callback(const unsigned char *payLoad, size_t size);
+CustomMQTTClient::~CustomMQTTClient()
+{
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Utilities
-static void CheckConnection()
+void CustomMQTTClient::CheckConnection()
 {
     if (resetClient)
     {
@@ -66,7 +52,7 @@ static void CheckConnection()
     }
 }
 
-static void AZIoTLog(LOG_CATEGORY log_category, const char *file, const char *func, const int line, unsigned int options, const char *format, ...)
+void CustomMQTTClient::AZIoTLog(LOG_CATEGORY log_category, const char *file, const char *func, const int line, unsigned int options, const char *format, ...)
 {
     va_list arg;
     char temp[64];
@@ -119,7 +105,7 @@ static void AZIoTLog(LOG_CATEGORY log_category, const char *file, const char *fu
     }
 }
 
-static char *GetHostNameFromConnectionString(char *connectionString)
+char* CustomMQTTClient::GetHostNameFromConnectionString(char *connectionString)
 {
     if (connectionString == NULL)
     {
@@ -162,7 +148,7 @@ static char *GetHostNameFromConnectionString(char *connectionString)
     return NULL;
 }
 
-static void FreeEventInstance(EVENT_INSTANCE *event)
+void CustomMQTTClient::FreeEventInstance(EVENT_INSTANCE *event)
 {
     if (event != NULL)
     {
@@ -176,7 +162,7 @@ static void FreeEventInstance(EVENT_INSTANCE *event)
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Event handlers
-static void ConnectionStatusCallback(IOTHUB_CLIENT_CONNECTION_STATUS result, IOTHUB_CLIENT_CONNECTION_STATUS_REASON reason, void *userContextCallback)
+void CustomMQTTClient::ConnectionStatusCallback(IOTHUB_CLIENT_CONNECTION_STATUS result, IOTHUB_CLIENT_CONNECTION_STATUS_REASON reason, void *userContextCallback)
 {
     clientConnected = false;
 
@@ -230,7 +216,7 @@ static void ConnectionStatusCallback(IOTHUB_CLIENT_CONNECTION_STATUS result, IOT
     }
 }
 
-static void SendConfirmationCallback(IOTHUB_CLIENT_CONFIRMATION_RESULT result, void *userContextCallback)
+void CustomMQTTClient::SendConfirmationCallback(IOTHUB_CLIENT_CONFIRMATION_RESULT result, void *userContextCallback)
 {
     EVENT_INSTANCE *event = (EVENT_INSTANCE *)userContextCallback;
     LogInfo(">>>Confirmation[%d] received for message tracking id = %d with result = %s", callbackCounter++, event->trackingId, ENUM_TO_STRING(IOTHUB_CLIENT_CONFIRMATION_RESULT, result));
@@ -256,7 +242,7 @@ static void SendConfirmationCallback(IOTHUB_CLIENT_CONFIRMATION_RESULT result, v
     }
 }
 
-static IOTHUBMESSAGE_DISPOSITION_RESULT ReceiveMessageCallback(IOTHUB_MESSAGE_HANDLE message, void *userContextCallback)
+IOTHUBMESSAGE_DISPOSITION_RESULT CustomMQTTClient::ReceiveMessageCallback(IOTHUB_MESSAGE_HANDLE message, void *userContextCallback)
 {
     int *counter = (int *)userContextCallback;
     const char *buffer;
@@ -291,16 +277,16 @@ static IOTHUBMESSAGE_DISPOSITION_RESULT ReceiveMessageCallback(IOTHUB_MESSAGE_HA
     return IOTHUBMESSAGE_ACCEPTED;
 }
 
-static void DeviceTwinCallback(DEVICE_TWIN_UPDATE_STATE updateState, const unsigned char *payLoad, size_t size, void *userContextCallback)
+void CustomMQTTClient::DeviceTwinCallback(DEVICE_TWIN_UPDATE_STATE updateState, const unsigned char *payLoad, size_t size, void *userContextCallback)
 {
-    ota_callback(payLoad, size);
+    //ota_callback(payLoad, size);
     if (_device_twin_callback)
     {
         _device_twin_callback(updateState, payLoad, size);
     }
 }
 
-static int DeviceMethodCallback(const char *methodName, const unsigned char *payload, size_t size, unsigned char **response, size_t *response_size, void *userContextCallback)
+int CustomMQTTClient::DeviceMethodCallback(const char *methodName, const unsigned char *payload, size_t size, unsigned char **response, size_t *response_size, void *userContextCallback)
 {
     if (_device_method_callback)
     {
@@ -314,7 +300,7 @@ static int DeviceMethodCallback(const char *methodName, const unsigned char *pay
     return 404;
 }
 
-static void ReportConfirmationCallback(int statusCode, void *userContextCallback)
+void CustomMQTTClient::ReportConfirmationCallback(int statusCode, void *userContextCallback)
 {
     EVENT_INSTANCE *event = (EVENT_INSTANCE *)userContextCallback;
     LogInfo(">>>Confirmation[%d] received for state tracking id = %d with state code = %d", callbackCounter++, event->trackingId, statusCode);
@@ -340,7 +326,7 @@ static void ReportConfirmationCallback(int statusCode, void *userContextCallback
     }
 }
 
-static bool SendEventOnce(EVENT_INSTANCE *event)
+bool CustomMQTTClient::SendEventOnce(EVENT_INSTANCE *event)
 {
     if (event == NULL)
     {
@@ -417,7 +403,7 @@ static bool SendEventOnce(EVENT_INSTANCE *event)
 }
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // MQTT APIs
-EVENT_INSTANCE *CustomMQTTClient_Event_Generate(const char *eventString, EVENT_TYPE type)
+EVENT_INSTANCE* CustomMQTTClient::CustomMQTTClient_Event_Generate(const char *eventString, EVENT_TYPE type)
 {
     if (eventString == NULL)
     {
@@ -445,7 +431,7 @@ EVENT_INSTANCE *CustomMQTTClient_Event_Generate(const char *eventString, EVENT_T
     return event;
 }
 
-void CustomMQTTClient_Event_AddProp(EVENT_INSTANCE *message, const char *key, const char *value)
+void CustomMQTTClient::CustomMQTTClient_Event_AddProp(EVENT_INSTANCE *message, const char *key, const char *value)
 {
     if (message == NULL || key == NULL)
         return;
@@ -453,7 +439,7 @@ void CustomMQTTClient_Event_AddProp(EVENT_INSTANCE *message, const char *key, co
     Map_AddOrUpdate(propMap, key, value);
 }
 
-bool CustomMQTTClient_Init(char* connectionString, bool hasDeviceTwin, bool traceOn)
+bool CustomMQTTClient::CustomMQTTClient_Init(char* connectionString, bool hasDeviceTwin, bool traceOn)
 {
     if (iotHubClientHandle != NULL)
     {
@@ -540,7 +526,7 @@ bool CustomMQTTClient_Init(char* connectionString, bool hasDeviceTwin, bool trac
             return false;
         }
 
-        if (IoTHubClient_LL_SetDeviceMethodCallback(iotHubClientHandle, DeviceMethodCallback, NULL) != IOTHUB_CLIENT_OK)
+        if (IoTHubClient_LL_SetDeviceMethodCallback(iotHubClientHandle, &DeviceMethodCallback, NULL) != IOTHUB_CLIENT_OK)
         {
             LogError("Failed on IoTHubClient_LL_SetDeviceMethodCallback");
             return false;
@@ -571,7 +557,7 @@ bool CustomMQTTClient_Init(char* connectionString, bool hasDeviceTwin, bool trac
     return true;
 }
 
-bool CustomMQTTClient_SetOption(const char* optionName, const void* value)
+bool CustomMQTTClient::CustomMQTTClient_SetOption(const char* optionName, const void* value)
 {
     if ((iotHubClientHandle == NULL && (strcmp(optionName, OPTION_MINI_SOLUTION_NAME) != 0))
             || optionName == NULL || value == NULL)
@@ -599,7 +585,7 @@ bool CustomMQTTClient_SetOption(const char* optionName, const void* value)
     }
 }
 
-bool CustomMQTTClient_SendEvent(const char *text)
+bool CustomMQTTClient::CustomMQTTClient_SendEvent(const char *text)
 {
     if (text == NULL)
     {
@@ -615,7 +601,7 @@ bool CustomMQTTClient_SendEvent(const char *text)
     return false;
 }
 
-bool CustomMQTTClient_ReceiveEvent()
+bool CustomMQTTClient::CustomMQTTClient_ReceiveEvent()
 {
     CheckConnection();
 
@@ -642,7 +628,7 @@ bool CustomMQTTClient_ReceiveEvent()
     return false;
 }
 
-bool CustomMQTTClient_ReportState(const char *stateString)
+bool CustomMQTTClient::CustomMQTTClient_ReportState(const char *stateString)
 {
     if (stateString == NULL)
     {
@@ -658,7 +644,7 @@ bool CustomMQTTClient_ReportState(const char *stateString)
     return false;
 }
 
-bool CustomMQTTClient_SendEventInstance(EVENT_INSTANCE *event)
+bool CustomMQTTClient::CustomMQTTClient_SendEventInstance(EVENT_INSTANCE *event)
 {
     if (event == NULL)
     {
@@ -668,7 +654,7 @@ bool CustomMQTTClient_SendEventInstance(EVENT_INSTANCE *event)
     return SendEventOnce(event);
 }
 
-void CustomMQTTClient_Check(bool hasDelay)
+void CustomMQTTClient::CustomMQTTClient_Check(bool hasDelay)
 {
     if (iotHubClientHandle == NULL || SystemWiFiRSSI() == 0)
     {
@@ -692,7 +678,7 @@ void CustomMQTTClient_Check(bool hasDelay)
     }
 }
 
-void CustomMQTTClient_Close(void)
+void CustomMQTTClient::CustomMQTTClient_Close(void)
 {
     if (iotHubClientHandle != NULL)
     {
@@ -707,43 +693,43 @@ void CustomMQTTClient_Close(void)
     }
 }
 
-void CustomMQTTClient_SetConnectionStatusCallback(CONNECTION_STATUS_CALLBACK connection_status_callback)
+void CustomMQTTClient::CustomMQTTClient_SetConnectionStatusCallback(CONNECTION_STATUS_CALLBACK connection_status_callback)
 {
     _connection_status_callback = connection_status_callback;
 }
 
-void CustomMQTTClient_SetSendConfirmationCallback(SEND_CONFIRMATION_CALLBACK send_confirmation_callback)
+void CustomMQTTClient::CustomMQTTClient_SetSendConfirmationCallback(SEND_CONFIRMATION_CALLBACK send_confirmation_callback)
 {
     _send_confirmation_callback = send_confirmation_callback;
 }
 
-void CustomMQTTClient_SetMessageCallback(MESSAGE_CALLBACK message_callback)
+void CustomMQTTClient::CustomMQTTClient_SetMessageCallback(MESSAGE_CALLBACK message_callback)
 {
     _message_callback = message_callback;
 }
 
-void CustomMQTTClient_SetDeviceTwinCallback(DEVICE_TWIN_CALLBACK device_twin_callback)
+void CustomMQTTClient::CustomMQTTClient_SetDeviceTwinCallback(DEVICE_TWIN_CALLBACK device_twin_callback)
 {
     _device_twin_callback = device_twin_callback;
 }
 
-void CustomMQTTClient_SetDeviceMethodCallback(DEVICE_METHOD_CALLBACK device_method_callback)
+void CustomMQTTClient::CustomMQTTClient_SetDeviceMethodCallback(DEVICE_METHOD_CALLBACK device_method_callback)
 {
     _device_method_callback = device_method_callback;
 }
 
-void CustomMQTTClient_SetReportConfirmationCallback(REPORT_CONFIRMATION_CALLBACK report_confirmation_callback)
+void CustomMQTTClient::CustomMQTTClient_SetReportConfirmationCallback(REPORT_CONFIRMATION_CALLBACK report_confirmation_callback)
 {
     _report_confirmation_callback = report_confirmation_callback;
 }
 
-void CustomMQTTClient_Reset(void)
+void CustomMQTTClient::CustomMQTTClient_Reset(void)
 {
     resetClient = true;
     CheckConnection();
 }
 
-void CustomLogTrace(const char *event, const char *message)
+void CustomMQTTClient::CustomLogTrace(const char *event, const char *message)
 {
     // Microsoft collects data to operate effectively and provide you the best experiences with our products.
     // We collect data about the features you use, how often you use them, and how you use them.

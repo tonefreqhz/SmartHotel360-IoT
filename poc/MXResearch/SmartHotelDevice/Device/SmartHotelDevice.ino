@@ -20,7 +20,9 @@ static int iotHubMessageCount = 0;
 //static IOTHUB_CLIENT_LL_HANDLE iotHubClientHandle;
 //static IOTHUB_CLIENT_HANDLE iotHubClientHandle;
 
-static void SendConfirmationCallback(IOTHUB_CLIENT_CONFIRMATION_RESULT result)
+static CustomMQTTClient* customMQTTClient;
+
+static void SHSendConfirmationCallback(IOTHUB_CLIENT_CONFIRMATION_RESULT result)
 {
   if (result == IOTHUB_CLIENT_CONFIRMATION_OK)
   {
@@ -160,11 +162,11 @@ void setup()
 
 
 
-  CustomMQTTClient_SetOption(OPTION_MINI_SOLUTION_NAME, "SmartHotelDevice");
-  CustomMQTTClient_Init(dtIotHubConnectionString, true, false);
+  customMQTTClient = new CustomMQTTClient(dtIotHubConnectionString, true, false);
+  customMQTTClient->CustomMQTTClient_SetOption(OPTION_MINI_SOLUTION_NAME, "SmartHotelDevice");
 
-  CustomMQTTClient_SetSendConfirmationCallback(SendConfirmationCallback);
-  CustomMQTTClient_SetDeviceMethodCallback(DeviceMethodCallback);
+  customMQTTClient->CustomMQTTClient_SetSendConfirmationCallback(SHSendConfirmationCallback);
+  customMQTTClient->CustomMQTTClient_SetDeviceMethodCallback(DeviceMethodCallback);
 
   sendIntervalInMs = SystemTickCounterRead();
 
@@ -207,8 +209,8 @@ void loop()
 
         if (createSensorMessagePayload(messageCount++, tempFahrenheit, roomOccupied, messagePayload))
         {
-          EVENT_INSTANCE* message = CustomMQTTClient_Event_Generate(messagePayload, MESSAGE);
-          CustomMQTTClient_SendEventInstance(message);
+          EVENT_INSTANCE* message = customMQTTClient->CustomMQTTClient_Event_Generate(messagePayload, MESSAGE);
+          customMQTTClient->CustomMQTTClient_SendEventInstance(message);
         }
         
         sendIntervalInMs = SystemTickCounterRead();
@@ -216,7 +218,7 @@ void loop()
     }
     else
     {
-      CustomMQTTClient_Check(true);
+      customMQTTClient->CustomMQTTClient_Check(true);
       Screen.print(3, "Idle");
     }
   }
