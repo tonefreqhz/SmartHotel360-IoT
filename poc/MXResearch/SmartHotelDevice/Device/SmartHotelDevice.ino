@@ -141,6 +141,8 @@ void setup()
   sprintf(dtIotHubConnectionString, "%s", connectionString);
 
 
+  DeviceInfo* deviceInfo = getDTIoTHubDeviceInfo(HARDWARE_ID, SAS_TOKEN);
+
   // Load connection from EEPROM
   //EEPROMInterface eeprom;
   //uint8_t connString[AZ_IOT_HUB_MAX_LEN + 1] = {'\0'};

@@ -7,6 +7,7 @@
 #include "RGB_LED.h"
 #include "Sensor.h"
 #include "http_client.h"
+#include "utilities.h"
 
 #define RGB_LED_BRIGHTNESS 32
 #define LOOP_DELAY 1000
@@ -33,6 +34,8 @@ int interval = INTERVAL;
 float lastTemperatureSent;
 bool lastRoomOccupied;
 bool lastRoomOccupiedSent;
+
+
 
 char* initializeWiFi()
 {
@@ -189,22 +192,6 @@ bool createSensorMessagePayload(int messageId, float temperature, bool roomOccup
     return true;
 }
 
-bool sendPayloadToFunction(char *azureFunctionUri, char *content)
-{
-    int length = strlen(content) + 1;
-
-    if (content == NULL || length <= 0 || length > MAX_UPLOAD_SIZE)
-    {
-    Serial.println("Content not valid");
-    return false;
-    }
-
-    HTTPClient client = HTTPClient(HTTP_POST, azureFunctionUri);
-    const Http_Response *response = client.send(content, length);
-
-    return (response != NULL && response->status_code == 200);
-}
-
 const char* getDTIoTHubConnectionString(char* hardwareId, char* sasToken)
 {
     char azureFunctionUri[256];
@@ -232,52 +219,68 @@ const char* getDTIoTHubConnectionString(char* hardwareId, char* sasToken)
     return connectionString;
 }
 
-
-const char SSL_CA_PEM[] = "-----BEGIN CERTIFICATE-----\n"
-                          "MIIEkjCCA3qgAwIBAgIQCgFBQgAAAVOFc2oLheynCDANBgkqhkiG9w0BAQsFADA/\n"
-                          "MSQwIgYDVQQKExtEaWdpdGFsIFNpZ25hdHVyZSBUcnVzdCBDby4xFzAVBgNVBAMT\n"
-                          "DkRTVCBSb290IENBIFgzMB4XDTE2MDMxNzE2NDA0NloXDTIxMDMxNzE2NDA0Nlow\n"
-                          "SjELMAkGA1UEBhMCVVMxFjAUBgNVBAoTDUxldCdzIEVuY3J5cHQxIzAhBgNVBAMT\n"
-                          "GkxldCdzIEVuY3J5cHQgQXV0aG9yaXR5IFgzMIIBIjANBgkqhkiG9w0BAQEFAAOC\n"
-                          "AQ8AMIIBCgKCAQEAnNMM8FrlLke3cl03g7NoYzDq1zUmGSXhvb418XCSL7e4S0EF\n"
-                          "q6meNQhY7LEqxGiHC6PjdeTm86dicbp5gWAf15Gan/PQeGdxyGkOlZHP/uaZ6WA8\n"
-                          "SMx+yk13EiSdRxta67nsHjcAHJyse6cF6s5K671B5TaYucv9bTyWaN8jKkKQDIZ0\n"
-                          "Z8h/pZq4UmEUEz9l6YKHy9v6Dlb2honzhT+Xhq+w3Brvaw2VFn3EK6BlspkENnWA\n"
-                          "a6xK8xuQSXgvopZPKiAlKQTGdMDQMc2PMTiVFrqoM7hD8bEfwzB/onkxEz0tNvjj\n"
-                          "/PIzark5McWvxI0NHWQWM6r6hCm21AvA2H3DkwIDAQABo4IBfTCCAXkwEgYDVR0T\n"
-                          "AQH/BAgwBgEB/wIBADAOBgNVHQ8BAf8EBAMCAYYwfwYIKwYBBQUHAQEEczBxMDIG\n"
-                          "CCsGAQUFBzABhiZodHRwOi8vaXNyZy50cnVzdGlkLm9jc3AuaWRlbnRydXN0LmNv\n"
-                          "bTA7BggrBgEFBQcwAoYvaHR0cDovL2FwcHMuaWRlbnRydXN0LmNvbS9yb290cy9k\n"
-                          "c3Ryb290Y2F4My5wN2MwHwYDVR0jBBgwFoAUxKexpHsscfrb4UuQdf/EFWCFiRAw\n"
-                          "VAYDVR0gBE0wSzAIBgZngQwBAgEwPwYLKwYBBAGC3xMBAQEwMDAuBggrBgEFBQcC\n"
-                          "ARYiaHR0cDovL2Nwcy5yb290LXgxLmxldHNlbmNyeXB0Lm9yZzA8BgNVHR8ENTAz\n"
-                          "MDGgL6AthitodHRwOi8vY3JsLmlkZW50cnVzdC5jb20vRFNUUk9PVENBWDNDUkwu\n"
-                          "Y3JsMB0GA1UdDgQWBBSoSmpjBH3duubRObemRWXv86jsoTANBgkqhkiG9w0BAQsF\n"
-                          "AAOCAQEA3TPXEfNjWDjdGBX7CVW+dla5cEilaUcne8IkCJLxWh9KEik3JHRRHGJo\n"
-                          "uM2VcGfl96S8TihRzZvoroed6ti6WqEBmtzw3Wodatg+VyOeph4EYpr/1wXKtx8/\n"
-                          "wApIvJSwtmVi4MFU5aMqrSDE6ea73Mj2tcMyo5jMd6jmeWUHK8so/joWUoHOUgwu\n"
-                          "X4Po1QYz+3dszkDqMp4fklxBwXRsW10KXzPMTZ+sOPAveyxindmjkW8lGy+QsRlG\n"
-                          "PfZ+G6Z6h7mjem0Y+iWlkYcV4PIWL1iwBi8saCbGS5jN2p8M+X+Q7UNKEkROb3N6\n"
-                          "KOqkqm57TH2H3eDJAkSnh6/DNFu0Qg==\n"
-                          "-----END CERTIFICATE-----\n";
-
-char* httpTest()
+DeviceInfo* getDTIoTHubDeviceInfo(char* hardwareId, char* sasToken)
 {
-    HTTPClient *httpClient = new HTTPClient(SSL_CA_PEM, HTTP_GET, "https://httpbin.org/status/418");
+    char azureFunctionUri[256];
+    sprintf(azureFunctionUri, "%sDevices?hardwareIds=%s&%s", MANAGEMENT_BASE_URL, hardwareId, DEVICES_INCLUDE_ARGUMENT);
+
+    HTTPClient *httpClient = new HTTPClient(HTTP_GET, azureFunctionUri);
+    httpClient->set_header("Authorization", sasToken);
     const Http_Response* result = httpClient->send();
+
+    char outputString[512];
 
     char* status = (char *)malloc(20);
 
-    if (result == NULL)
+    JSON_Value* root_value = json_parse_string(result->body);
+    JSON_Array* devices = json_value_get_array(root_value);
+    if (json_array_get_count(devices) != 1)
     {
-        sprintf(status, "Error: %s", httpClient->get_error());
+        return nullptr;
     }
-    else
+
+    DeviceInfo* deviceInfo = new DeviceInfo;
+
+    JSON_Object* device = json_array_get_object(devices, 0);
+    deviceInfo->id = json_object_get_string(device, "id");
+    deviceInfo->connectionString = json_object_get_string(device, "connectionString");
+    deviceInfo->friendlyName = json_object_get_string(device, "friendlyName");
+    deviceInfo->deviceType = json_object_get_string(device, "deviceType");
+    deviceInfo->deviceSubtype = json_object_get_string(device, "deviceSubtype");
+    deviceInfo->hardwareId = json_object_get_string(device, "hardwareId");
+    deviceInfo->spaceId = json_object_get_string(device, "spaceId");
+    deviceInfo->status = json_object_get_string(device, "status");
+
+
+    JSON_Array* sensors = json_object_get_array(device, "sensors");
+    for (int sensorIndex=0; sensorIndex<json_array_get_count(sensors); sensorIndex++)
     {
-        sprintf(status, "%s", result->status_message);
+        SensorInfo* sensorInfo = new SensorInfo;
+
+        JSON_Object* sensor = json_array_get_object(devices, sensorIndex);
+        sensorInfo->id = json_object_get_string(sensor, "id");
     }
+
+    Screen.print(0, "Works!");
+
 
     delete httpClient;
 
-    return status;
+    return deviceInfo;
 }
+
+//bool sendPayloadToFunction(char *azureFunctionUri, char *content)
+//{
+//    int length = strlen(content) + 1;
+//
+//    if (content == NULL || length <= 0 || length > MAX_UPLOAD_SIZE)
+//    {
+//    Serial.println("Content not valid");
+//    return false;
+//    }
+//
+//    HTTPClient client = HTTPClient(HTTP_POST, azureFunctionUri);
+//    const Http_Response *response = client.send(content, length);
+//
+//    return (response != NULL && response->status_code == 200);
+//}
